@@ -1,0 +1,16 @@
+{% extends 'image_compare/base.html' %}
+{% load staticfiles %}
+{% block extrahead %}
+<script src="{% static 'js/main.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div id="form_wrapper">
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="well" id="form_well">
+        {{form}}
+        <input id="submit_img" class="btn btn-primary" type="submit" value="Submit" />
+        </div>
+    </form>
+</div>
+{% endblock %}

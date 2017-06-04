@@ -1,0 +1,46 @@
+body {
+    background-color:#FFFFFF
+}
+
+div.header {
+    margin: 0px auto;
+    width: 76%;
+    height: 136px;
+    padding: 0px 15px;
+    box-sizing: content-box;
+    position:relative;
+}
+
+div.content {
+    min-height:450px;
+    margin: 0px auto;
+    box-sizing: content-box;
+    width: 76%;
+    padding: 15px;
+}
+
+div#form_wrapper {
+    margin:auto;
+    width:50%;
+}
+
+div#header_filler {
+    display:table-cell;
+    vertical-align:middle;
+    height: 100% !Important;
+    margin-left:80px;
+}
+
+div#logo_wrapper {
+    display:table-cell;
+    vertical-align:middle;
+
+}
+
+div#form_well {
+    width:70%;
+}
+
+input#submit_img {
+    margin:auto;
+}

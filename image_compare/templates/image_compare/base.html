@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    {% load staticfiles %}
+
+    <head>
+
+        <script src="{% static 'js/jquery-3.2.1.min.js' %}"></script>
+
+        <script src="{% static 'bootstrap/js/bootstrap.min.js' %}"></script>
+        <link rel="stylesheet" type="text/css" href="{% static 'bootstrap/css/bootstrap.min.css' %}" />
+        <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}" />
+        {% block extrahead %}
+        {% endblock %}
+    </head>
+    <body>
+        <div class="header">
+            <div id="logo_wrapper">
+                <img src="{% static 'images/sslogo.png' %}" height="135" width="281"></img>
+            </div>
+            <div id="header_filler">
+                <h1>Image Compare Demo App</h1>
+            </div>
+        </div>
+        <div class="content">
+                {% block content %}
+                {% endblock %}
+        </div>
+    </body>
+</html>
