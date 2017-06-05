@@ -1,0 +1,26 @@
+{% extends 'image_compare/base.html' %}
+{% load staticfiles %}
+{% block extrahead %}
+<script src="{% static 'js/main.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div id="form_wrapper">
+
+
+
+        <div class="well" id="form_well">
+            <h4 id="heading">Image Compare Demo App</h4>
+            <center>
+                <p>success</p>
+                <br />
+                {{histogram_data.red_band}}<br/>
+                {{histogram_data.blue_band}}<br/>
+                {{histogram_data.green_band}}<br/>
+                {{histogram_data.alpha_band}}<br/>
+                <a href="{{index}}">Back</a>
+            </center>
+
+        </div>
+
+</div>
+{% endblock %}

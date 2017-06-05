@@ -3,25 +3,32 @@ body {
 }
 
 div.header {
-    margin: 0px auto;
-    width: 76%;
+    margin: auto;
+    width: 75%;
     height: 136px;
     padding: 0px 15px;
-    box-sizing: content-box;
-    position:relative;
+    text-align:center;
 }
 
 div.content {
     min-height:450px;
-    margin: 0px auto;
+    margin: auto;
     box-sizing: content-box;
-    width: 76%;
+    width: 75%;
     padding: 15px;
 }
 
 div#form_wrapper {
+    text-align:center;
     margin:auto;
     width:50%;
+}
+
+h3#heading {
+    text-align:center;
+    margin:auto;
+    width:60%;
+    padding:0,40px;
 }
 
 div#header_filler {
