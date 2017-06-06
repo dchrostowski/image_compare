@@ -14,11 +14,14 @@ BAND_GROUPS = 4
 default_val = [0 for x in range(0,BAND_GROUPS)]
 # Create your models here.
 
-class ImageHistogram(models.Model):
+class ImageMetadata(models.Model):
     filename=models.CharField(max_length=100,primary_key=True)
     num_bands=models.IntegerField(null=False,blank=False)
+    height=models.IntegerField(null=False,blank=False)
+    width=models.IntegerField(null=False,blank=False)
     total_pixels=models.IntegerField(null=False,blank=False)
     red_band = ArrayField(models.DecimalField(max_digits=10,decimal_places=4,null=False,blank=False),size=BAND_GROUPS,default=default_val)
     green_band = ArrayField(models.DecimalField(max_digits=10,decimal_places=4,null=False,blank=False),size=BAND_GROUPS,default=default_val)
     blue_band = ArrayField(models.DecimalField(max_digits=10,decimal_places=4,null=False,blank=False),size=BAND_GROUPS,default=default_val)
-    alpha_band = ArrayField(models.DecimalField(max_digits=10,decimal_places=4,null=False,blank=False),size=BAND_GROUPS,default=default_val)
+    vectors = ArrayField(models.DecimalField(max_digits=10,decimal_places=4,null=False,blank=False), default=[0.0])
+    norm = models.DecimalField(max_digits=10,decimal_places=4,null=False,blank=False)

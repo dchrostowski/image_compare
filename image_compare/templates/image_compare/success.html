@@ -8,17 +8,42 @@
 
 
 
-        <div class="well" id="form_well">
+        <div class="well" id="result_well">
             <h4 id="heading">Image Compare Demo App</h4>
-            <center>
-                <p>success</p>
-                <br />
-                {{histogram_data.red_band}}<br/>
-                {{histogram_data.blue_band}}<br/>
-                {{histogram_data.green_band}}<br/>
-                {{histogram_data.alpha_band}}<br/>
+            <div class="well_container">You searched for:</div>
+            <div class="row">
+            <div class="col-md-4">
+              <div class="thumbnail">
+                <a href="{{query}}" target="_blank">
+                  <img src="{{query}}" style="width:100%">
+                </a>
+              </div>
+            </div>
+            </div>
+
+            <br />
+            <br />
+            <div class="well_container">Found these results:</div>
+            <br />
+            <br />
+            <br />
+
+            <div class="row">
+            {% for file in files %}
+                <div class="col-md-4">
+                  <div class="thumbnail">
+                    <a href="{{file}}" target="_blank">
+                      <img src="{{file}}" style="width:100%">
+                    </a>
+                  </div>
+                </div>
+            {% endfor %}
+            </div>
+            <br /><br />
+            <div class="well_container">
                 <a href="{{index}}">Back</a>
-            </center>
+            </div>
+
 
         </div>
 

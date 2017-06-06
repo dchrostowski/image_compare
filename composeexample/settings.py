@@ -25,7 +25,7 @@ SECRET_KEY = '!$bwa2(psjzz$zp^wz)tsjp+@1)*!!ez!pwo220vv1$6kys_-@'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['dev3.streetscrape.com']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition

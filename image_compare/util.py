@@ -1,24 +1,35 @@
 
-from .models import ImageHistogram, BAND_GROUPS
+from .models import ImageMetadata, BAND_GROUPS
 import re
 from PIL import Image
 import math
 import hashlib
 from os import listdir,remove
+import os
 from django.core.files.uploadedfile import UploadedFile
 import numpy
+from shutil import copyfile, rmtree
 
 IMAGE_DIR='images/'
+SESSION_DIR = 'image_compare/static/sessions/'
+PUBLIC_SESSION_DIR = '/static/sessions/'
 
 def load_initial_images():
-    histograms = ImageHistogram.objects.all()
+    histograms = ImageMetadata.objects.all()
     db_files = []
-    for hist in histograms:
-
-        print(hist.filename)
-        db_files.append(hist.filename)
-
     on_disk = listdir(IMAGE_DIR)
+    for hist in histograms:
+        print("FILENAME IN DB:")
+        print(hist.filename)
+        print(hist.height)
+        print(hist.width)
+        if hist.filename not in on_disk:
+            hist.delete()
+        else:
+            #hist.delete()
+            db_files.append(hist.filename)
+
+
 
     for f in on_disk:
         if f not in db_files:
@@ -40,71 +51,156 @@ def load_initial_images():
                 for chunk in if_chunks:
                     ofh.write(chunk)
 
-            calculate_histogram(new_filename, save_to_db=True)
+            calculate_metadata(new_filename, save_to_db=True)
 
-def compare_images(h1,h2):
-    def sum_array(arr):
-        sum = 0
-        for a in arr:
-            sum+=a
-        return sum
+def compare_images_via_cross_correlation(h1,h2):
+    print("HI NORMS:")
+    print(h1.norm)
+    print("h1 vectors:")
+    print(h1.vectors)
+    print("h1.height: %s,%s" % (h1.height,h1.width))
+    print("h2.height/width: %s,%s" % (h2.height, h2.width))
+    print(h2.vectors)
+    print(h2.norm)
+    h1_vectors = [numpy.float64(float(v)) for v in h1.vectors]
+    h2_vectors = [numpy.float64(float(v)) for v in h2.vectors]
+    return numpy.dot(h1_vectors / numpy.float64(float(h1.norm)), h2_vectors / numpy.float64(float(h2.norm)))
 
-    h1_buckets = []
-    h2_buckets = []
+# Will compare using normalized cross correlation or color histogram
+# normalized cross correlation is only valid for images with identical dimensions
+# Will fallback to histogram method if the images are not compatible
+def compare_images_via_histogram(h1,h2):
+
+    h1_band_groups = []
+    h2_band_groups = []
+
+    band_attrs = ['red_band','green_band','blue_band']
 
     # Concatenate previously calcuated band histogram data in order
-    h1_buckets.extend(h1.red_band)
-    h2_buckets.extend(h2.red_band)
-    h1_buckets.extend(h1.green_band)
-    h2_buckets.extend(h2.green_band)
-    h1_buckets.extend(h1.blue_band)
-    h2_buckets.extend(h2.blue_band)
-    h1_buckets.extend(h1.alpha_band)
-    h2_buckets.extend(h2.alpha_band)
+    for ba in band_attrs:
+        h1_band_groups.extend(getattr(h1,ba))
+        h2_band_groups.extend(getattr(h2,ba))
 
-    if len(h1_buckets) != len(h2_buckets):
+    if len(h1_band_groups) != len(h2_band_groups):
         raise Exception("Non matching band data")
 
 
-    bucket_len = len(h1_buckets)
+    group_len = len(h1_band_groups)
     # Find te difference between each band bucket grouped by color and sum up the result
     # The smaller the result, the more similar the images are
-    return sum_array([abs(h1_buckets[i] - h2_buckets[i]) for i in range(0,bucket_len)])
+    return sum([abs(float(h1_band_groups[i]) - float(h2_band_groups[i])) for i in range(0,group_len)])
 
 
-def find_similar(file1):
+def find_similar(file1,skey):
 
-    histograms_on_file = ImageHistogram.objects.all()
-    cur_histogram = calculate_histogram(file1)
+    metadata_on_file = ImageMetadata.objects.all()
+    cur_metadata = calculate_metadata(file1,save_to_db=False)
+    session_dir = "%s%s" % (SESSION_DIR,skey)
+    try:
+        rmtree(session_dir)
+    except FileNotFoundError as e:
+        pass
 
-    similarity_lookup = {}
-    threshold = None
+    histogram_lookup = {}
+    sim_lookup = {}
+
     similar_images = []
-    for h in histograms_on_file:
-        s = compare_images(cur_histogram, h)
-        if s in similarity_lookup:
-            similarity_lookup[s].append(h.filename)
+    for m in metadata_on_file:
+        # compare by cross correlation if height and width of images are the same
+        if m.height == cur_metadata.height and m.width == cur_metadata.width:
+            print("height and width match")
+            print("cur: %s,%s | m: %s,%s " % (cur_metadata.height,cur_metadata.width, m.height, m.width))
+            s = compare_images_via_cross_correlation(cur_metadata,m)
+            if s in sim_lookup:
+                sim_lookup[s].append(m.filename)
+            else:
+                sim_lookup[s] = [m.filename]
+            print(sim_lookup)
+        # otherwise compare with histogram method
         else:
-            similarity_lookup[s] = [h.filename]
+            s = compare_images_via_histogram(cur_metadata, m)
+            if s in histogram_lookup:
+                histogram_lookup[s].append(m.filename)
+            else:
+                histogram_lookup[s] = [m.filename]
 
 
-    #sorted_keys =
+    # treating the worst score as 0 % similar and a score of 0 as 100 % similar
+    histogram_scores = sorted([s for s in histogram_lookup.keys()])
+    worst = histogram_scores[-1] or 1
+
+    # normalize histogram scores to create a curved percentage where worst score is 0% similar; 0 = 100% similar
+    for score in histogram_lookup.keys():
+        normalized = 1-(score/worst)
+        files = histogram_lookup[score]
+        if normalized in sim_lookup:
+            sim_lookup[normalized].extend(files)
+        else:
+            sim_lookup[normalized] = files
+
+
+    print("SIM LOOKUP:")
+    print(sim_lookup)
+    scores = sorted(sim_lookup.keys(),reverse=True)
+
+
+    # Performs O(n) lookup of smallest values in an array
+    best_scores = scores[:3]
+    best_images = []
+    for b in best_scores:
+        best_images.extend(sim_lookup[b])
+    # If there were any ties in similarity, more than three images could have been added
+    best_images = best_images[:3]
+    # Create a static directory named with session key, copy images to that directory
+
+    try:
+        os.mkdir(session_dir)
+        os.chmod(session_dir,666)
+        os.mkdir("%s/%s" % (session_dir, 'query'))
+        os.chmod("%s/%s" % (session_dir, 'query'), 666)
+    except FileExistsError as e:
+        rmtree(session_dir)
+        os.mkdir(session_dir)
+
+    copied_files = []
+
+    copyfile("%s%s" % (IMAGE_DIR,file1), "%s/query/%s" % (session_dir,file1))
+    copied_files.append("%s%s/query/%s" % (PUBLIC_SESSION_DIR,skey,file1))
+
+    for img in best_images:
+        dst = "%s/%s" % (session_dir,img)
+        public_dst = "%s%s/%s" % (PUBLIC_SESSION_DIR, skey, img)
+        copyfile("%s%s" % (IMAGE_DIR,img), dst)
+        copied_files.append(public_dst)
+
+
+    return copied_files
 
 
 
+def calculate_vectors(image):
+    vectors = []
+
+    smaller_image = image.resize((int(image.width/8),int(image.height/8)))
+    for t in smaller_image.getdata():
+        v = numpy.average(t)
+        vectors.append(v)
+    norm = numpy.linalg.norm(vectors,2)
+    return (vectors,norm)
 
 
-
-
-def calculate_histogram(image_file,save_to_db=False):
+# computing some data for comparison using one of two methods: color histogram and normalized cross correlation
+def calculate_metadata(image_file,save_to_db=False):
     # Open an image file
     full_filepath = "%s%s" % (IMAGE_DIR, image_file)
     image = Image.open(full_filepath)
+    # Convert all images to RGB so that images can be compared with or without alpha band
+    image = image.convert("RGB")
     # Get the number of pixels so that the histograms can be normalized
     total_pixels = image.height * image.width
     # Split the image into bands.  This creates one image for each band
     bands = image.split()
-    band_order = ['red','green','blue','alpha']
+    band_order = ['red','green','blue']
     # Make buckets for each band.  This will be used to count groups of similarly colored pixels
     buckets = {band_order[i]: band for i,band in enumerate(bands)}
 
@@ -120,13 +216,12 @@ def calculate_histogram(image_file,save_to_db=False):
         start_idx=0
         end_idx=interval
         i=0
-        print("LEN HISTOGRAM: %s " % len(histogram))
         while end_idx <= len(histogram):
             # Sum up the pixel counts for range start_idx to end_idx
             for pixel_val in histogram[start_idx:end_idx]:
                 band_buckets[i] += pixel_val
             # Divide each band bucket by the number of pixels in the image to normalize it
-            band_buckets[i] /= total_pixels
+            band_buckets[i] /= total_pixels * 1000
             start_idx = end_idx
             end_idx += interval
             i+=1
@@ -137,16 +232,17 @@ def calculate_histogram(image_file,save_to_db=False):
     # buckets['green'] = [g1,g2,g3,g4]
     # buckets['blue'] = [b1,b2,b3.b4]
     # buckets['alpha'] = [a1,a2,a3,a4]
-    hist_model = ImageHistogram(filename=image_file,num_bands=len(bands),total_pixels=total_pixels,
-      red_band=buckets['red'], green_band=buckets['green'], blue_band=buckets['blue'],
-      alpha_band=buckets.get('alpha',[0 for x in range(0,BAND_GROUPS)])
-    )
+    vectors, norm = calculate_vectors(image)
+    image_metadata = ImageMetadata(filename=image_file,height=image.height,width=image.width,num_bands=len(bands),total_pixels=total_pixels,
+      red_band=buckets['red'], green_band=buckets['green'], blue_band=buckets['blue'],vectors=vectors, norm=norm)
     if save_to_db:
-        hist_model.save()
+        image_metadata.save()
 
-    return hist_model
+    return image_metadata
 
-def handle_uploaded_file(f):
+def handle_uploaded_file(f,skey):
+    print("HANDLE UPLOADED GET SESSION KEY:")
+    print(skey)
     filename = f.name
     extension = re.search(r'(\w+)$',f.name)
     if extension:
@@ -162,4 +258,4 @@ def handle_uploaded_file(f):
         for chunk in f.chunks():
             df.write(chunk)
 
-    return calculate_histogram(filename)
+    return find_similar(filename,skey)
